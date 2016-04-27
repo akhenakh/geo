@@ -228,6 +228,40 @@ func (l Loop) Vertices() []Point {
 	return l.vertices
 }
 
+// ContainsCell checks whether the cell is completely enclosed by this loop.
+// Does not count for loop interior and uses raycasting.
+func (l Loop) ContainsCell(c Cell) bool {
+	for i := 0; i < 4; i++ {
+		v := c.Vertex(i)
+		if !l.ContainsPoint(v) {
+			return false
+		}
+	}
+	return true
+}
+
+//IntersectsCell returns false if the region does not intersect the given cell.
+//Otherwise, either region intersects the cell, or the it contains the cell.
+func (l Loop) IntersectsCell(c Cell) bool {
+	// if any of the cell's vertices is contained by the loop
+	// they intersect
+	for i := 0; i < 4; i++ {
+		v := c.Vertex(i)
+		if l.ContainsPoint(v) {
+			return true
+		}
+	}
+	// missing case from the above implementation
+	// where the loop is fully contained by the cell
+	for _, v := range l.Vertices() {
+		if c.ContainsPoint(v) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ContainsPoint returns true if the loop contains the point.
 func (l Loop) ContainsPoint(p Point) bool {
 	// TODO(sbeckman): Move to bruteForceContains and update with ShapeIndex when available.
