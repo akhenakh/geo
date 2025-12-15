@@ -23,7 +23,7 @@ import (
 
 func TestShapeIndexBasics(t *testing.T) {
 	index := NewShapeIndex()
-	s := &edgeVectorShape{}
+	s := &EdgeVectorShape{}
 
 	if index.Len() != 0 {
 		t.Errorf("initial index should be empty after creation")
@@ -431,7 +431,7 @@ func TestShapeIndexManyTinyEdges(t *testing.T) {
 	// Construct two points in the same leaf cell.
 	a := cellIDFromPoint(PointFromCoords(1, 0, 0)).Point()
 	b := Point{a.Add(r3.Vector{X: 0, Y: 1e-12, Z: 0}).Normalize()}
-	shape := &edgeVectorShape{}
+	shape := &EdgeVectorShape{}
 	for range 100 {
 		shape.Add(a, b)
 	}
