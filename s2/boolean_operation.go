@@ -15,7 +15,7 @@
 package s2
 
 import (
-	"fmt"
+	"sort"
 
 	"github.com/golang/geo/s1"
 )
@@ -58,14 +58,6 @@ func NewBooleanOperation(opType BooleanOperationOpType, layer BuilderLayer, opts
 }
 
 // Build executes the operation.
-//
-// NOTE: This implementation currently primarily supports UNION.
-// Intersection and Difference require the "CrossingProcessor" logic from C++
-// which selectively includes edges based on winding numbers.
-//
-// For this port, we provide the architecture. A full geometric boolean op
-// engine is 5000+ lines of C++. This version sets up the Builder correctly
-// so that if you implement the edge filtering (clipping), the rest works.
 func (b *BooleanOperation) Build(indexA, indexB *ShapeIndex) error {
 	builder := NewBuilder(BuilderOptions{
 		SnapFunction:       b.Options.SnapFunction,
@@ -76,29 +68,134 @@ func (b *BooleanOperation) Build(indexA, indexB *ShapeIndex) error {
 		builder.StartLayer(layer)
 	}
 
-	// For UNION, we can simply add all edges from both.
-	// For INTERSECTION/DIFFERENCE, we would need to filter edges here
-	// based on containment in the other index.
+	// We process the boundaries of A against B, and B against A.
+	// The CrossingProcessor logic determines which parts of the edges are kept.
 
-	// Example Logic for UNION:
-	if b.OpType == BooleanOperationOpTypeUnion {
-		b.addEdges(builder, indexA)
-		b.addEdges(builder, indexB)
-	} else if b.OpType == BooleanOperationOpTypeIntersection {
-		// Naive intersection approximation: Only add edges from A that are inside B
-		// (This is incorrect for boundaries, but illustrates the filtering point)
-		// A proper implementation requires the EdgeClippingLayer logic.
-		return fmt.Errorf("intersection not fully implemented in this port")
+	// Process Region A edges against Region B
+	if err := b.processRegion(builder, indexA, indexB, false); err != nil {
+		return err
+	}
+
+	// Process Region B edges against Region A
+	if err := b.processRegion(builder, indexB, indexA, true); err != nil {
+		return err
 	}
 
 	return builder.Build()
 }
 
-func (b *BooleanOperation) addEdges(builder *Builder, index *ShapeIndex) {
-	for _, shape := range index.shapes {
-		for i := 0; i < shape.NumEdges(); i++ {
-			e := shape.Edge(i)
-			builder.AddEdge(e.V0, e.V1)
+// processRegion iterates over all edges in queryIndex, finds crossings with refIndex,
+// splits the edges, and adds the relevant segments to the builder based on the OpType.
+func (b *BooleanOperation) processRegion(builder *Builder, queryIndex, refIndex *ShapeIndex, processingB bool) error {
+	// Query to find crossings against the reference index.
+	crosser := NewCrossingEdgeQuery(refIndex)
+
+	// Query to check containment of vertices in the reference index.
+	// Using VertexModelSemiOpen matches standard S2 Polygon behavior.
+	containsQuery := NewContainsPointQuery(refIndex, VertexModelSemiOpen)
+
+	// Iterate over all shapes in the query index.
+	for _, shape := range queryIndex.shapes {
+		if shape == nil {
+			continue
+		}
+		// Iterate over all chains (loops/polylines) in the shape.
+		for chainID := 0; chainID < shape.NumChains(); chainID++ {
+			chain := shape.Chain(chainID)
+
+			// For Polygons (loops), we need to know the initial state (Inside/Outside).
+			// We test the start vertex of the first edge.
+			if chain.Length == 0 {
+				continue
+			}
+
+			startEdge := shape.ChainEdge(chainID, 0)
+
+			// Initial state: Is the start of the chain inside the reference region?
+			inside := containsQuery.Contains(startEdge.V0)
+
+			// Iterate over edges in the chain
+			for i := 0; i < chain.Length; i++ {
+				edge := shape.ChainEdge(chainID, i)
+
+				// Find all crossings for this edge against the reference index.
+				// CrossingTypeInterior ignores shared vertices, which is usually what we want for splitting.
+				// However, robust boolean ops usually need CrossingTypeAll to handle vertex intersections explicitly.
+				// For this simplified port, Interior captures the split points.
+				crossingMap := crosser.CrossingsEdgeMap(edge.V0, edge.V1, CrossingTypeInterior)
+
+				// Collect intersection points
+				var intersections []Point
+				for crossShape, edgeIDs := range crossingMap {
+					for _, crossEdgeID := range edgeIDs {
+						crossEdge := crossShape.Edge(crossEdgeID)
+						// Calculate exact intersection point
+						pt := Intersection(edge.V0, edge.V1, crossEdge.V0, crossEdge.V1)
+						intersections = append(intersections, pt)
+					}
+				}
+
+				// Sort intersections by distance from edge.V0 to handle multiple crossings correctly
+				sortIntersections(edge.V0, intersections)
+
+				// Emit segments
+				currPt := edge.V0
+				for _, nextPt := range intersections {
+					// Add segment if valid
+					if !currPt.ApproxEqual(nextPt) {
+						if b.shouldEmit(inside, processingB) {
+							builder.AddEdge(currPt, nextPt)
+						}
+					}
+
+					// Update state and current point
+					// Each crossing toggles the inside/outside state
+					inside = !inside
+					currPt = nextPt
+				}
+
+				// Add final segment from last intersection to edge.V1
+				if !currPt.ApproxEqual(edge.V1) {
+					if b.shouldEmit(inside, processingB) {
+						builder.AddEdge(currPt, edge.V1)
+					}
+				}
+			}
 		}
 	}
+	return nil
+}
+
+// shouldEmit determines if a segment should be output based on the operation type
+// and whether the segment is "inside" the other region.
+// processingB indicates if we are processing edges from the second region (B).
+func (b *BooleanOperation) shouldEmit(inside bool, processingB bool) bool {
+	switch b.OpType {
+	case BooleanOperationOpTypeUnion:
+		// A|B: Keep A if outside B, Keep B if outside A.
+		return !inside
+	case BooleanOperationOpTypeIntersection:
+		// A&B: Keep A if inside B, Keep B if inside A.
+		return inside
+	case BooleanOperationOpTypeDifference:
+		// A-B: Keep A if outside B. Keep B if inside A (as boundary of hole)?
+		// Standard difference usually keeps A's boundary outside B, and B's boundary inside A (reversed).
+		if processingB {
+			return inside // B's boundary inside A becomes part of the result's hole
+		}
+		return !inside // A's boundary outside B is kept
+	case BooleanOperationOpTypeSymmetricDifference:
+		// (A-B) | (B-A): Keep A if outside B, Keep B if outside A.
+		return !inside
+	}
+	return false
+}
+
+// sortIntersections sorts points based on distance from start.
+func sortIntersections(start Point, points []Point) {
+	sort.Slice(points, func(i, j int) bool {
+		di := ChordAngleBetweenPoints(start, points[i])
+		dj := ChordAngleBetweenPoints(start, points[j])
+		return di < dj
+	})
 }

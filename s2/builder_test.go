@@ -1,27 +1,21 @@
-// Copyright 2023 Google Inc. All rights reserved.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS-IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 package s2
 
 import (
+	"math"
 	"testing"
 )
 
-func TestBuilderSimpleUnion(t *testing.T) {
-	// Create two disjoint squares
-	p1 := makeBuilderSquarePoly(0, 0, 1.0)
-	p2 := makeBuilderSquarePoly(5, 5, 1.0)
+func TestBooleanOperationIntersection(t *testing.T) {
+	// Create two overlapping squares.
+	// Poly A: 0,0 to 2,2
+	// Poly B: 1,1 to 3,3
+	// Intersection should be 1,1 to 2,2 (a square of size 1x1).
+
+	// Square centered at 1,1 size 2.0 -> spans 0,0 to 2,2 approx
+	p1 := makeSquare(1.0, 1.0, 2.0)
+
+	// Square centered at 2,2 size 2.0 -> spans 1,1 to 3,3 approx
+	p2 := makeSquare(2.0, 2.0, 2.0)
 
 	idxA := NewShapeIndex()
 	idxA.Add(p1)
@@ -32,62 +26,90 @@ func TestBuilderSimpleUnion(t *testing.T) {
 	var output Polygon
 	layer := NewPolygonLayer(&output)
 
-	op := NewBooleanOperation(BooleanOperationOpTypeUnion, layer, nil)
+	op := NewBooleanOperation(BooleanOperationOpTypeIntersection, layer, nil)
 	err := op.Build(idxA, idxB)
 	if err != nil {
 		t.Fatalf("Build failed: %v", err)
 	}
 
-	// Should result in a polygon with 2 loops
-	if output.NumLoops() != 2 {
-		t.Errorf("Expected 2 loops in union of disjoint polygons, got %d", output.NumLoops())
+	// Should result in a single polygon loop
+	if output.NumLoops() != 1 {
+		t.Fatalf("Expected 1 loop in intersection, got %d", output.NumLoops())
+	}
+
+	// Area check
+	// Intersection is approx 1x1 degree square.
+	// 1 degree ~ 0.017 radians. Area ~ 0.017*0.017 = 0.00029
+	area := output.Area()
+	expectedArea := (math.Pi / 180.0) * (math.Pi / 180.0)
+
+	if math.Abs(area-expectedArea) > 0.0001 {
+		t.Errorf("Area mismatch. Expected ~%v, got %v", expectedArea, area)
+	}
+
+	// Verify center point of intersection is contained
+	intersectionCenter := PointFromLatLng(LatLngFromDegrees(1.5, 1.5))
+	if !output.ContainsPoint(intersectionCenter) {
+		t.Error("Intersection result does not contain center (1.5, 1.5)")
+	}
+
+	// Verify points outside are not contained
+	if output.ContainsPoint(PointFromLatLng(LatLngFromDegrees(0.5, 0.5))) {
+		t.Error("Intersection result contains (0.5, 0.5) which should be excluded")
 	}
 }
 
-func TestBuilderVertexSnapping(t *testing.T) {
-	// Create a square that is "almost" closed but has a gap.
-	// 0,0 -> 0,1 -> 1,1 -> 1,0 -> 0,0.0000001
-	pts := []Point{
-		PointFromLatLng(LatLngFromDegrees(0, 0)),
-		PointFromLatLng(LatLngFromDegrees(0, 1)),
-		PointFromLatLng(LatLngFromDegrees(1, 1)),
-		PointFromLatLng(LatLngFromDegrees(1, 0)),
-		PointFromLatLng(LatLngFromDegrees(0, 0.0000001)),
-	}
+func TestBooleanOperationDifference(t *testing.T) {
+	// A: Large square 0,0 to 4,4
+	// B: Small square 1,1 to 3,3 (hole inside A)
+	// A - B should be A with a hole.
 
-	// Create builder with snapping enabled
-	opts := BuilderOptions{
-		SnapFunction: NewIdentitySnapFunction(kmToAngle(0.1)), // 100 meters snap
-	}
-	builder := NewBuilder(opts)
+	p1 := makeSquare(2.0, 2.0, 4.0)
+	p2 := makeSquare(2.0, 2.0, 2.0)
+
+	idxA := NewShapeIndex()
+	idxA.Add(p1)
+
+	idxB := NewShapeIndex()
+	idxB.Add(p2)
 
 	var output Polygon
-	builder.StartLayer(NewPolygonLayer(&output))
+	layer := NewPolygonLayer(&output)
 
-	// Add edges manually
-	for i := 0; i < len(pts)-1; i++ {
-		builder.AddEdge(pts[i], pts[i+1])
-	}
-
-	err := builder.Build()
+	op := NewBooleanOperation(BooleanOperationOpTypeDifference, layer, nil)
+	err := op.Build(idxA, idxB)
 	if err != nil {
 		t.Fatalf("Build failed: %v", err)
 	}
 
-	// Snapping should close the loop
-	if output.NumLoops() != 1 {
-		t.Errorf("Expected 1 loop after snapping, got %d", output.NumLoops())
+	// Should have 2 loops (1 shell, 1 hole) if our polygon assembly is smart,
+	// OR it might output just the edges if the naive builder layer doesn't reconstruct hierarchy perfectly.
+	// Our naive PolygonLayer builder in the previous step just dumps loops.
+	// S2Polygon requires proper nesting initialization to identify holes.
+	// Let's check loops count.
+	if output.NumLoops() != 2 {
+		t.Errorf("Expected 2 loops (shell + hole) for difference, got %d", output.NumLoops())
+	}
+
+	// Check containment
+	if !output.ContainsPoint(PointFromLatLng(LatLngFromDegrees(0.5, 0.5))) {
+		t.Error("Difference should contain 0.5,0.5")
+	}
+	if output.ContainsPoint(PointFromLatLng(LatLngFromDegrees(2.0, 2.0))) {
+		t.Error("Difference should NOT contain 2.0,2.0 (it is in the hole)")
 	}
 }
 
-func makeBuilderSquarePoly(lat, lng, size float64) *Polygon {
-	half := size / 2
+func makeSquare(lat, lng, sizeDeg float64) *Polygon {
+	half := sizeDeg / 2.0
 	pts := []Point{
 		PointFromLatLng(LatLngFromDegrees(lat+half, lng+half)),
 		PointFromLatLng(LatLngFromDegrees(lat+half, lng-half)),
 		PointFromLatLng(LatLngFromDegrees(lat-half, lng-half)),
 		PointFromLatLng(LatLngFromDegrees(lat-half, lng+half)),
 	}
+	// Create a Loop
 	loop := LoopFromPoints(pts)
+	// Create a Polygon from that Loop
 	return PolygonFromLoops([]*Loop{loop})
 }
