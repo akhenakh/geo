@@ -83,7 +83,7 @@ func generateCapEdges(centerCap Cap, maxLength s1.Angle, count int) []Edge {
 }
 
 func testCrossingEdgeQueryAllCrossings(t *testing.T, edges []Edge) {
-	s := &edgeVectorShape{}
+	s := &EdgeVectorShape{}
 	for _, edge := range edges {
 		s.Add(edge.V0, edge.V1)
 	}

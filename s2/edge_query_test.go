@@ -589,7 +589,7 @@ func generateEdgeQueryWithTargets(opts *edgeQueryBenchmarkOptions, query *EdgeQu
 		case queryTypeIndex:
 			targetIndex := NewShapeIndex()
 			if opts.chooseTargetFromIndex {
-				var shape edgeVectorShape
+				var shape EdgeVectorShape
 				for i := 0; i < opts.numTargetEdges; i++ {
 					edge := sampleEdgeFromIndex(queryIndex)
 					shape.Add(edge.V0, edge.V1)
