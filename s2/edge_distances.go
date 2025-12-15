@@ -474,6 +474,15 @@ func PointOnRay(origin, dir Point, r s1.Angle) Point {
 	return Point{origin.Mul(math.Cos(float64(r))).Add(dir.Mul(math.Sin(float64(r)))).Normalize()}
 }
 
+// GetDistanceFraction returns the distance ratio of the point X along an edge AB.
+// If X is on the line segment AB, this is the fraction T such
+// that X == Interpolate(T, A, B).
+//
+// This requires that A and B are distinct.
+func GetDistanceFraction(x, a, b Point) float64 {
+	return DistanceFraction(x, a, b)
+}
+
 // TODO(rsned): Differences from C++
 // IsEdgeBNearEdgeA
 // PointOnLineError
