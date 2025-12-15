@@ -538,8 +538,8 @@ func (t *tracker) restoreStateBefore(limitShapeID int32) {
 }
 
 // lowerBound returns the shapeID of the first entry x where x >= shapeID.
-func (t *tracker) lowerBound(shapeID int32) int32 {
-	panic("not implemented")
+func (t *tracker) lowerBound(shapeID int32) int {
+	return sort.Search(len(t.shapeIDs), func(i int) bool { return t.shapeIDs[i] >= shapeID })
 }
 
 // removedShape represents a set of edges from the given shape that is queued for removal.
@@ -665,11 +665,7 @@ func (s *ShapeIndex) End() *ShapeIndexIterator {
 
 // Region returns a new ShapeIndexRegion for this ShapeIndex.
 func (s *ShapeIndex) Region() *ShapeIndexRegion {
-	return &ShapeIndexRegion{
-		index:         s,
-		containsQuery: NewContainsPointQuery(s, VertexModelSemiOpen),
-		iter:          s.Iterator(),
-	}
+	return NewShapeIndexRegion(s)
 }
 
 // Len reports the number of Shapes in this index.
@@ -967,6 +963,18 @@ func (s *ShapeIndex) updateFaceEdges(face int, faceEdges []faceEdge, t *tracker)
 	s.updateEdges(pcell, clippedEdges, t, disjointFromIndex)
 }
 
+// internalIterator returns a new iterator positioned at the beginning of the index
+// without triggering index updates. This is safe to use only when the index lock
+// is already held (e.g. during applyUpdatesInternal).
+func (s *ShapeIndex) internalIterator() *ShapeIndexIterator {
+	it := &ShapeIndexIterator{
+		index: s,
+	}
+	it.position = 0
+	it.refresh()
+	return it
+}
+
 // shrinkToFit shrinks the PaddedCell to fit within the given bounds.
 func (s *ShapeIndex) shrinkToFit(pcell *PaddedCell, bound r2.Rect) CellID {
 	shrunkID := pcell.ShrinkToFit(bound)
@@ -974,29 +982,13 @@ func (s *ShapeIndex) shrinkToFit(pcell *PaddedCell, bound r2.Rect) CellID {
 	if !s.isFirstUpdate() && shrunkID != pcell.CellID() {
 		// Don't shrink any smaller than the existing index cells, since we need
 		// to combine the new edges with those cells.
-		iter := s.Iterator()
+		// Use internal iterator to avoid deadlock.
+		iter := s.internalIterator()
 		if iter.LocateCellID(shrunkID) == Indexed {
 			shrunkID = iter.CellID()
 		}
 	}
 	return shrunkID
-}
-
-// skipCellRange skips over the cells in the given range, creating index cells if we are
-// currently in the interior of at least one shape.
-func (s *ShapeIndex) skipCellRange(begin, end CellID, t *tracker, disjointFromIndex bool) {
-	// If we aren't in the interior of a shape, then skipping over cells is easy.
-	if len(t.shapeIDs) == 0 {
-		return
-	}
-
-	// Otherwise generate the list of cell ids that we need to visit, and create
-	// an index entry for each one.
-	skipped := CellUnionFromRange(begin, end)
-	for _, cell := range skipped {
-		var clippedEdges []*clippedEdge
-		s.updateEdges(PaddedCellFromCellID(cell, cellPadding), clippedEdges, t, disjointFromIndex)
-	}
 }
 
 // updateEdges adds or removes the given edges whose bounding boxes intersect a
@@ -1028,7 +1020,8 @@ func (s *ShapeIndex) updateEdges(pcell *PaddedCell, edges []*clippedEdge, t *tra
 		// There may be existing index cells contained inside pcell. If we
 		// encounter such a cell, we need to combine the edges being updated with
 		// the existing cell contents by absorbing the cell.
-		iter := s.Iterator()
+		// Use internal iterator to avoid deadlock.
+		iter := s.internalIterator()
 		r := iter.LocateCellID(pcell.id)
 		switch r {
 		case Disjoint:
@@ -1140,6 +1133,23 @@ func (s *ShapeIndex) updateEdges(pcell *PaddedCell, edges []*clippedEdge, t *tra
 	}
 }
 
+// skipCellRange skips over the cells in the given range, creating index cells if we are
+// currently in the interior of at least one shape.
+func (s *ShapeIndex) skipCellRange(begin, end CellID, t *tracker, disjointFromIndex bool) {
+	// If we aren't in the interior of a shape, then skipping over cells is easy.
+	if len(t.shapeIDs) == 0 {
+		return
+	}
+
+	// Otherwise generate the list of cell ids that we need to visit, and create
+	// an index entry for each one.
+	skipped := CellUnionFromRange(begin, end)
+	for _, cell := range skipped {
+		var clippedEdges []*clippedEdge
+		s.updateEdges(PaddedCellFromCellID(cell, cellPadding), clippedEdges, t, disjointFromIndex)
+	}
+}
+
 // makeIndexCell builds an indexCell from the given padded cell and set of edges and adds
 // it to the index. If the cell or edges are empty, no cell is added.
 func (s *ShapeIndex) makeIndexCell(p *PaddedCell, edges []*clippedEdge, t *tracker) bool {
@@ -1245,7 +1255,17 @@ func (s *ShapeIndex) makeIndexCell(p *PaddedCell, edges []*clippedEdge, t *track
 
 	// Add this cell to the map.
 	s.cellMap[p.id] = cell
-	s.cells = append(s.cells, p.id)
+
+	// Maintain sorted order of s.cells.
+	if s.isFirstUpdate() {
+		s.cells = append(s.cells, p.id)
+	} else {
+		// insert sorted
+		idx := sort.Search(len(s.cells), func(i int) bool { return s.cells[i] >= p.id })
+		s.cells = append(s.cells, 0)
+		copy(s.cells[idx+1:], s.cells[idx:])
+		s.cells[idx] = p.id
+	}
 
 	// Shift the tracker focus point to the exit vertex of this cell.
 	if t.isActive && len(edges) != 0 {
@@ -1477,7 +1497,15 @@ func (s *ShapeIndex) absorbIndexCell(p *PaddedCell, iter *ShapeIndexIterator, ed
 	// flagging the swap because newEdges is no longer used after
 	// this.
 	edges, newEdges = newEdges, edges // nolint
-	delete(s.cellMap, p.id)
+
+	cellID := iter.CellID()
+	delete(s.cellMap, cellID)
+
+	// Remove from s.cells. iter.position is the index in s.cells.
+	pos := iter.position
+	if pos < len(s.cells) && s.cells[pos] == cellID {
+		s.cells = append(s.cells[:pos], s.cells[pos+1:]...)
+	}
 }
 
 // testAllEdges calls the trackers testEdge on all edges from shapes that have interiors.
