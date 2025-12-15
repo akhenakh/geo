@@ -15,8 +15,49 @@
 package s2
 
 import (
+	"math/rand"
 	"testing"
 )
+
+// Shape interface enforcement
+var (
+	_ Shape = (*edgeVectorShape)(nil)
+)
+
+// edgeVectorShape is a Shape representing an arbitrary set of edges. It
+// is used for testing, but it can also be useful if you have, say, a
+// collection of polylines and don't care about memory efficiency (since
+// this type would store most of the vertices twice).
+type edgeVectorShape struct {
+	edges []Edge
+}
+
+// edgeVectorShapeFromPoints returns an edgeVectorShape of length 1 from the given points.
+func edgeVectorShapeFromPoints(a, b Point) *edgeVectorShape {
+	e := &edgeVectorShape{
+		edges: []Edge{
+			{a, b},
+		},
+	}
+	return e
+}
+
+// Add adds the given edge to the shape.
+func (e *edgeVectorShape) Add(a, b Point) {
+	e.edges = append(e.edges, Edge{a, b})
+}
+func (e *edgeVectorShape) NumEdges() int                          { return len(e.edges) }
+func (e *edgeVectorShape) Edge(id int) Edge                       { return e.edges[id] }
+func (e *edgeVectorShape) ReferencePoint() ReferencePoint         { return OriginReferencePoint(false) }
+func (e *edgeVectorShape) NumChains() int                         { return len(e.edges) }
+func (e *edgeVectorShape) Chain(chainID int) Chain                { return Chain{chainID, 1} }
+func (e *edgeVectorShape) ChainEdge(chainID, offset int) Edge     { return e.edges[chainID] }
+func (e *edgeVectorShape) ChainPosition(edgeID int) ChainPosition { return ChainPosition{edgeID, 0} }
+func (e *edgeVectorShape) IsEmpty() bool                          { return defaultShapeIsEmpty(e) }
+func (e *edgeVectorShape) IsFull() bool                           { return defaultShapeIsFull(e) }
+func (e *edgeVectorShape) Dimension() int                         { return 1 }
+func (e *edgeVectorShape) typeTag() typeTag                       { return typeTagNone }
+func (e *edgeVectorShape) privateInterface()                      {}
 
 func TestEdgeVectorShapeEmpty(t *testing.T) {
 	var shape edgeVectorShape
@@ -67,4 +108,44 @@ func TestEdgeVectorShapeSingletonConstructor(t *testing.T) {
 	}
 }
 
-// TODO(roberts): TestEdgeVectorShapeEdgeAccess
+func TestEdgeVectorShapeEdgeAccess(t *testing.T) {
+	shape := NewEdgeVectorShape()
+	rng := rand.New(rand.NewSource(12345))
+	const numEdges = 100
+	var edges []Edge
+	for i := 0; i < numEdges; i++ {
+		a := randomPoint(rng)
+		b := randomPoint(rng)
+		edges = append(edges, Edge{a, b})
+		shape.Add(a, b)
+	}
+
+	if shape.NumEdges() != numEdges {
+		t.Errorf("NumEdges() = %d, want %d", shape.NumEdges(), numEdges)
+	}
+	if shape.NumChains() != numEdges {
+		t.Errorf("NumChains() = %d, want %d", shape.NumChains(), numEdges)
+	}
+	if shape.Dimension() != 1 {
+		t.Errorf("Dimension() = %d, want 1", shape.Dimension())
+	}
+	if shape.IsEmpty() {
+		t.Error("IsEmpty() = true, want false")
+	}
+	if shape.IsFull() {
+		t.Error("IsFull() = true, want false")
+	}
+
+	for i := 0; i < numEdges; i++ {
+		if shape.Chain(i).Start != i {
+			t.Errorf("Chain(%d).Start = %d, want %d", i, shape.Chain(i).Start, i)
+		}
+		if shape.Chain(i).Length != 1 {
+			t.Errorf("Chain(%d).Length = %d, want 1", i, shape.Chain(i).Length)
+		}
+		edge := shape.Edge(i)
+		if edge != edges[i] {
+			t.Errorf("Edge(%d) = %v, want %v", i, edge, edges[i])
+		}
+	}
+}
