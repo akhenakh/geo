@@ -100,7 +100,7 @@ func TestRegionTermIndexerRandomCaps(t *testing.T) {
 				// Compute expected results by brute force
 				covering := coverer.Covering(cap)
 				expected := make(map[int]bool)
-				for j, _ := range caps {
+				for j := range caps {
 					if covering.Intersects(coverings[j]) {
 						expected[j] = true
 					}

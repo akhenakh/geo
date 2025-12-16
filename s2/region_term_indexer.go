@@ -147,11 +147,10 @@ func (r *RegionTermIndexer) GetIndexTermsForPoint(point Point, prefix string) []
 // The covering must satisfy the S2RegionCoverer options for this class.
 func (r *RegionTermIndexer) GetIndexTermsForCanonicalCovering(covering CellUnion, prefix string) []string {
 	var terms []string
-	if r.Options.IndexContainsPointsOnly {
-		// If the index contains points only, we shouldn't be indexing regions.
-		// (This logic mirrors the C++ check).
-		// In Go we can't easily CHECK failure, so we just proceed, but this configuration is invalid.
-	}
+	// If the index contains points only, we shouldn't be indexing regions.
+	// (This logic mirrors the C++ check).
+	// In Go we can't easily CHECK failure, so we just proceed, but this configuration is invalid.
+	// TODO: Consider adding proper error handling or logging for this invalid configuration when r.Options.IndexContainsPointsOnly
 
 	trueMaxLevel := r.Options.trueMaxLevel()
 	var prevID CellID
@@ -211,10 +210,7 @@ func (r *RegionTermIndexer) GetQueryTermsForPoint(point Point, prefix string) []
 	}
 
 	// Add covering terms for all the ancestor cells.
-	for {
-		if level < r.Options.MinLevel {
-			break
-		}
+	for level >= r.Options.MinLevel {
 		terms = append(terms, r.getTerm(termTypeCovering, id.Parent(level), prefix))
 		level -= r.Options.LevelMod
 	}
