@@ -1,3 +1,23 @@
+# AI Assisted Port of the C++ Library
+
+This is an experimental AI port of some of the C++ functionalities missing in the Go version, it was done with Gemini 3 & Codestral.
+
+Methodology was to fill as much as possible the context with existing Go code and existing C++ code, asking to port feature by feature and reuse existing C++ tests.
+
+Original port is human made.
+
+Use at your own risk!!
+
+### Ported Features
+
+- `PolylineSimplifier` It simplifies a polyline while guaranteeing the result stays within a specified tolerance (maximum error) of the original.
+- `BufferOperation` Creates a polygon that surrounds a shape at a specific distance. For example, "Create a 5-mile exclusion zone around this flight path."
+- `ClosestPointQuery` Finds the closest vertex (not edge) to a target. It is generally faster than EdgeQuery when dealing with massive sets of isolated points (like POIs).
+- `ShapeIndexRegion` Geofencing, region coverage analysis, hierarchical spatial indexing.
+- `RegionTermIndexer` Large-scale geo-search, database-backed location queries, approximate-then-refine search patterns.
+- `Builder` and `CrossingEdge` Processing user-drawn boundaries, importing data from external sources, fixing GPS traces.
+- `BooleanOperation` Merging service areas, combining geographic regions, computing overlapping zones.
+
 # S2 geometry library in Go
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/golang/geo.svg)](https://pkg.go.dev/github.com/golang/geo) [![Go Build and Test](https://github.com/golang/geo/actions/workflows/go.yml/badge.svg)](https://github.com/golang/geo/actions/workflows/go.yml) [![CodeQL](https://github.com/golang/geo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/golang/geo/actions/workflows/github-code-scanning/codeql) [![golangci-lint](https://github.com/golang/geo/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/golang/geo/actions/workflows/golangci-lint.yml) [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/golang/geo?label=OpenSSF%20Scorecard&style=flat)](https://scorecard.dev/viewer/?uri=github.com/golang/geo)
