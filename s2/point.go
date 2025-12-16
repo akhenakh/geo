@@ -200,6 +200,10 @@ func (p Point) CellUnionBound() []CellID {
 	return p.CapBound().CellUnionBound()
 }
 
+func (p Point) MayIntersect(c Cell) bool {
+	return c.ContainsPoint(p)
+}
+
 // Contains reports if this Point contains the other Point.
 // (This method matches all other s2 types where the reflexive Contains
 // method does not contain the type's name.)
