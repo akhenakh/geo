@@ -111,16 +111,17 @@ func (q *ClosestPointQueryBase) FindClosestPoints(target distanceTarget, options
 	q.findClosestPointsInternal(target, options)
 
 	results := make([]ClosestPointQueryResult, 0, len(q.resultVector)+q.resultHeap.Len())
-	if options.MaxResults == 1 {
+	switch options.MaxResults {
+	case 1:
 		if len(q.resultVector) > 0 {
 			results = append(results, q.resultVector[0])
 		}
-	} else if options.MaxResults == math.MaxInt32 {
+	case math.MaxInt32:
 		sort.Slice(q.resultVector, func(i, j int) bool {
 			return q.resultVector[i].Less(q.resultVector[j])
 		})
 		results = append(results, q.resultVector...)
-	} else {
+	default:
 		for q.resultHeap.Len() > 0 {
 			results = append(results, heap.Pop(&q.resultHeap).(ClosestPointQueryResult))
 		}
@@ -206,7 +207,8 @@ func (q *ClosestPointQueryBase) initQueue() {
 		return
 	}
 
-	if q.options.MaxResults == 1 {
+	switch q.options.MaxResults {
+	case 1:
 		it := q.index.Iterator()
 		it.Seek(cellIDFromPoint(cap.Center()))
 		if !it.Done() {
@@ -274,12 +276,13 @@ func (q *ClosestPointQueryBase) maybeAddResult(p Point, data interface{}, id int
 		pointID:  id,
 	}
 
-	if q.options.MaxResults == 1 {
+	switch q.options.MaxResults {
+	case 1:
 		q.resultVector = []ClosestPointQueryResult{result}
 		q.distanceLimit = result.distance.sub(q.target.distance().fromChordAngle(q.options.MaxError))
-	} else if q.options.MaxResults == math.MaxInt32 {
+	case math.MaxInt32:
 		q.resultVector = append(q.resultVector, result)
-	} else {
+	default:
 		// Priority queue
 		if q.resultHeap.Len() >= q.options.MaxResults {
 			if !result.Less(q.resultHeap[0]) {
@@ -332,7 +335,7 @@ func (q *ClosestPointQueryBase) processOrEnqueue(id CellID, it *PointIndexIterat
 			}
 			return true // Seek to next child in caller
 		}
-		pending = append(pending, itClone.Index())
+		_ = append(pending, itClone.Index())
 		count++
 		itClone.Next()
 	}
