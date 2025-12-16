@@ -22,62 +22,71 @@ import (
 )
 
 func TestBufferOperationPoint(t *testing.T) {
-	// Test buffering a single point.
-	// This should produce a small circle (approximated polygon).
-
 	pt := PointFromLatLng(LatLngFromDegrees(0, 0))
-	radius := kmToAngle(100.0) // 100km radius
 
-	// Setup
+	// 100km is roughly 0.9 degrees on Earth
+	// radiusRadians := 100.0 / 6371.01 ~= 0.01569
+	radius := kmToAngle(100.0)
+
 	var resultPoly Polygon
 	layer := NewPolygonLayer(&resultPoly)
 
 	opts := DefaultBufferOperationOptions()
 	opts.BufferRadius = radius
+	// Use 0.1% error fraction to ensure the area approximation is close enough (within 1%)
+	// A 1% radial error can result in >1% area error for low vertex counts.
+	opts.ErrorFraction = 0.001
 
 	op := NewBufferOperation(layer, opts)
 
-	// Add point manually via shape interface simulation
-	// Since we don't have a PointShape, we call AddPoint directly
 	op.AddPoint(pt)
 
-	// Verify
+	// 1. Basic topology check
 	if resultPoly.NumLoops() != 1 {
 		t.Fatalf("Expected 1 loop for buffered point, got %d", resultPoly.NumLoops())
 	}
 
 	loop := resultPoly.Loop(0)
-	// Check area
-	// Cap area = 2*pi*(1-cos(r))
+
+	// 2. Area check
+	// Spherical Cap area = 2*pi*(1-cos(r))
+	// Because the buffer is a polygon inscribed/circumscribed (depending on implementation details)
+	// the area will be very close to the ideal circle area.
 	expectedArea := 2 * math.Pi * (1 - math.Cos(float64(radius)))
 	actualArea := loop.Area()
 
-	// Since it's a polygon approximation, area should be close but slightly less
-	if math.Abs(actualArea-expectedArea) > 0.1*expectedArea {
+	// Check if area is within 1% + small epsilon margin
+	if math.Abs(actualArea-expectedArea) > 0.01*expectedArea+1e-10 {
 		t.Errorf("Area mismatch. Expected ~%v, got %v", expectedArea, actualArea)
 	}
 
-	// Check containment
+	// 3. Containment checks
+
+	// Center should be inside
 	if !loop.ContainsPoint(pt) {
 		t.Error("Buffered region should contain the center point")
 	}
 
-	// Check a point on the rim
-	// rimPt := PointFromLatLng(LatLngFromDegrees(0, 0.9)) // 100km is roughly 0.9 degrees
-	// Radius in radians: 100/6371 ~= 0.015 rad ~= 0.9 degrees
-	// Actually 1 degree is ~111km.
-	// 100km is ~0.9 degrees.
-	// The generated polygon vertices should be at distance radius.
-	// Since we use a simple linear connection in the stub, the rim point might be slightly inside/outside depending on rotation.
+	// Point safely INSIDE the radius (e.g., 98km away)
+	// We use 98% of radius to account for the polygonal "flat" edges being slightly
+	// closer to the center than the true circle radius.
+	insidePt := PointFromLatLng(LatLngFromDegrees(0, 0.98*float64(radius.Degrees())))
+	if !loop.ContainsPoint(insidePt) {
+		t.Errorf("Point at 0.98*radius should be inside. Radius Deg: %f", radius.Degrees())
+	}
+
+	// Point safely OUTSIDE the radius (e.g., 102km away)
+	outsidePt := PointFromLatLng(LatLngFromDegrees(0, 1.02*float64(radius.Degrees())))
+	if loop.ContainsPoint(outsidePt) {
+		t.Error("Point at 1.02*radius should be outside")
+	}
 }
 
 func TestBufferOperationPolyline(t *testing.T) {
-	// Buffer a simple line segment.
-	// 0,0 -> 0,10 (vertical line approx)
 	p1 := PointFromLatLng(LatLngFromDegrees(0, 0))
 	p2 := PointFromLatLng(LatLngFromDegrees(10, 0))
 
-	radius := kmToAngle(10.0) // 10km buffer
+	radius := kmToAngle(10.0)
 
 	var resultPoly Polygon
 	layer := NewPolygonLayer(&resultPoly)
@@ -99,17 +108,15 @@ func TestBufferOperationPolyline(t *testing.T) {
 		t.Error("Buffered polyline should contain its midpoint")
 	}
 
-	// Check width at midpoint
-	// Point 10km east of midpoint should be inside/boundary
-	// Point 20km east should be outside
-
-	// Orthogonal direction is East (0,1,0) approx.
-	// Note: 0,0 is (1,0,0), 10,0 is (cos10, 0, sin10).
-	// Cross product is roughly Y axis.
-
-	// We can use the logic from S2:
+	// Check point to the left (inside buffer)
 	pInside := PointToLeft(mid, p2, s1.Angle(radius)/2)
 	if !loop.ContainsPoint(pInside) {
 		t.Error("Point inside buffer radius should be contained")
+	}
+
+	// Check point to the left (outside buffer)
+	pOutside := PointToLeft(mid, p2, s1.Angle(radius)*1.5)
+	if loop.ContainsPoint(pOutside) {
+		t.Error("Point outside buffer radius should not be contained")
 	}
 }

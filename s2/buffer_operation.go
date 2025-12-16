@@ -276,9 +276,8 @@ func (op *BufferOperation) closeEdgeArc(a, b Point) {
 }
 
 func (op *BufferOperation) addVertexArc(v, start, end Point) {
-	rotateDir := Point{v.Cross(start.Vector).Normalize()}
 	if op.bufferSign < 0 {
-		rotateDir = Point{rotateDir.Mul(-1)}
+		_ = Point{v.Cross(start.Vector).Normalize().Mul(-1)}
 	}
 
 	// Simplified arc logic for port: just add end point
@@ -321,9 +320,7 @@ func (op *BufferOperation) addOffsetVertex(p Point) {
 }
 
 func (op *BufferOperation) closeBufferRegion() {
-	if op.haveOffsetStart && op.haveInputStart {
-		// Update winding (stub)
-	}
+	// TODO: Update winding logic to be implemented when op.haveOffsetStart && op.haveInputStart
 }
 
 func (op *BufferOperation) outputPath() {
