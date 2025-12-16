@@ -169,6 +169,10 @@ func (p *Polyline) CellUnionBound() []CellID {
 	return p.CapBound().CellUnionBound()
 }
 
+func (p *Polyline) MayIntersect(c Cell) bool {
+	return p.IntersectsCell(c) // Polyline doesn't have a faster approx yet, bounds check is inside IntersectsCell
+}
+
 // NumEdges returns the number of edges in this shape.
 func (p *Polyline) NumEdges() int {
 	if len(*p) == 0 {

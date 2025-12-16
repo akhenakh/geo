@@ -56,6 +56,12 @@ type Region interface {
 	// computed quickly. The result is used by RegionCoverer as a starting
 	// point for further refinement.
 	CellUnionBound() []CellID
+
+	// MayIntersect reports whether the region *might* intersect the given cell.
+	// It returns false if the region definitely does not intersect.
+	// This method is intended to be fast and conservative (approximated).
+	// For most regions, this just checks intersection of bounding boxes.
+	MayIntersect(c Cell) bool
 }
 
 // Enforce Region interface satisfaction.

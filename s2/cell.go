@@ -308,6 +308,10 @@ func (c Cell) CellUnionBound() []CellID {
 	return []CellID{c.id}
 }
 
+func (c Cell) MayIntersect(other Cell) bool {
+	return c.IntersectsCell(other)
+}
+
 // latitude returns the latitude of the cell vertex in radians given by (i,j),
 // where i and j indicate the Hi (1) or Lo (0) corner.
 func (c Cell) latitude(i, j int) float64 {

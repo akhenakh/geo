@@ -685,6 +685,13 @@ func (l *Loop) CellUnionBound() []CellID {
 	return l.CapBound().CellUnionBound()
 }
 
+func (l *Loop) MayIntersect(c Cell) bool {
+	if !l.bound.Intersects(c.RectBound()) {
+		return false
+	}
+	return l.IntersectsCell(c)
+}
+
 // boundaryApproxIntersects reports if the loop's boundary intersects target.
 // It may also return true when the loop boundary does not intersect target but
 // some edge comes within the worst-case error tolerance.

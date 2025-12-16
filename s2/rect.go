@@ -298,6 +298,12 @@ func (r Rect) CellUnionBound() []CellID {
 	return r.CapBound().CellUnionBound()
 }
 
+// MayIntersect returns true if the rectangle intersects the given cell.
+// This is a fast approximation (checking bounding boxes).
+func (r Rect) MayIntersect(c Cell) bool {
+	return r.Intersects(c.RectBound())
+}
+
 // intersectsLatEdge reports whether the edge AB intersects the given edge of constant
 // latitude. Requires the points to have unit length.
 func intersectsLatEdge(a, b Point, lat s1.Angle, lng s1.Interval) bool {

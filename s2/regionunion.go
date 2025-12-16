@@ -64,6 +64,16 @@ func (ru RegionUnion) IntersectsCell(c Cell) bool {
 	return false
 }
 
+// MayIntersect reports whether this RegionUnion intersects the given cell.
+func (ru RegionUnion) MayIntersect(c Cell) bool {
+	for _, reg := range ru {
+		if reg.MayIntersect(c) {
+			return true
+		}
+	}
+	return false
+}
+
 // ContainsPoint reports whether this RegionUnion contains the Point.
 func (ru RegionUnion) ContainsPoint(p Point) bool {
 	for _, reg := range ru {
