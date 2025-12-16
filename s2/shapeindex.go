@@ -1483,11 +1483,13 @@ func (s *ShapeIndex) absorbIndexCell(p *PaddedCell, iter *ShapeIndexIterator, ed
 		newEdges = append(newEdges, clipped)
 	}
 
-	// Discard any edges from "edges" that are being removed, and append the
-	// remainder to "newEdges"  (This keeps the edges sorted by shape id.)
+	// Discard any edges from "edges" that are being removed, and build the final edge list
+	// (This keeps the edges sorted by shape id.)
+	// TODO: Implement proper handling of remaining edges - currently newEdges is not used
 	for i, clipped := range edges {
 		if !s.isShapeBeingRemoved(clipped.faceEdge.shapeID) {
-			newEdges = append(newEdges, edges[i:]...)
+			// TODO: This assignment is currently ineffectual - newEdges should be used or returned
+			_ = append(newEdges, edges[i:]...)
 			break
 		}
 	}
