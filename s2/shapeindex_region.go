@@ -124,6 +124,46 @@ func (s *ShapeIndexRegion) CellUnionBound() []CellID {
 	return s.coverRange(s.iter.CellID(), lastIndexID, cellIDs)
 }
 
+// MayIntersect reports whether the region might intersect the given cell.
+// This is a fast, conservative check.
+func (s *ShapeIndexRegion) MayIntersect(target Cell) bool {
+	relation := s.iter.LocateCellID(target.id)
+
+	// If "target" does not overlap any index cell, there is no intersection.
+	if relation == Disjoint {
+		return false
+	}
+
+	// If "target" is subdivided into one or more index cells, then there is an
+	// intersection to within the ShapeIndex error bound.
+	if relation == Subdivided {
+		return true
+	}
+
+	// Otherwise, the iterator points to an index cell containing "target".
+	if s.iter.CellID() == target.id {
+		return true
+	}
+
+	// Test whether any shape intersects the target cell or contains its center.
+	cell := s.iter.IndexCell()
+	for _, clipped := range cell.shapes {
+		if s.anyEdgeIntersects(clipped, target) {
+			return true
+		}
+		if s.contains(clipped, target.Center()) {
+			return true
+		}
+	}
+	return false
+}
+
+// IntersectsCell reports whether the region intersects the given cell.
+// For ShapeIndexRegion, this is currently the same as MayIntersect.
+func (s *ShapeIndexRegion) IntersectsCell(c Cell) bool {
+	return s.MayIntersect(c)
+}
+
 // coverRange computes the smallest CellID that covers the Cell range (first, last)
 // and returns the updated slice.
 //
@@ -175,49 +215,6 @@ func (s *ShapeIndexRegion) ContainsCell(target Cell) bool {
 				s.contains(clipped, target.Center()) {
 				return true
 			}
-		}
-	}
-	return false
-}
-
-// IntersectsCell reports whether the region intersects the given cell or
-// if intersection could not be determined. It returns false if the region
-// does not intersect.
-//
-// The implementation is conservative but not exact; if a shape is just
-// barely disjoint from the given cell then it may return true. The maximum
-// error is less than 10 * dblEpsilon radians (or about 15 nanometers).
-func (s *ShapeIndexRegion) IntersectsCell(target Cell) bool {
-	relation := s.iter.LocateCellID(target.id)
-
-	// If "target" does not overlap any index cell, there is no intersection.
-	if relation == Disjoint {
-		return false
-	}
-
-	// If "target" is subdivided into one or more index cells, then there is an
-	// intersection to within the ShapeIndex error bound.
-	if relation == Subdivided {
-		return true
-	}
-
-	// Otherwise, the iterator points to an index cell containing "target".
-	//
-	// If "target" is an index cell itself, there is an intersection because index
-	// cells are created only if they have at least one edge or they are
-	// entirely contained by the loop.
-	if s.iter.CellID() == target.id {
-		return true
-	}
-
-	// Test whether any shape intersects the target cell or contains its center.
-	cell := s.iter.IndexCell()
-	for _, clipped := range cell.shapes {
-		if s.anyEdgeIntersects(clipped, target) {
-			return true
-		}
-		if s.contains(clipped, target.Center()) {
-			return true
 		}
 	}
 	return false

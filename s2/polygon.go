@@ -669,6 +669,15 @@ func (p *Polygon) CellUnionBound() []CellID {
 	return p.CapBound().CellUnionBound()
 }
 
+func (p *Polygon) MayIntersect(c Cell) bool {
+	// Fast check
+	if !p.bound.Intersects(c.RectBound()) {
+		return false
+	}
+	// Delegate to exact check for now, or implement faster logic
+	return p.IntersectsCell(c)
+}
+
 // boundaryApproxIntersects reports whether the loop's boundary intersects cell.
 // It may also return true when the loop boundary does not intersect cell but
 // some edge comes within the worst-case error tolerance.

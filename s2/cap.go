@@ -439,6 +439,10 @@ func (c Cap) CellUnionBound() []CellID {
 	return cellIDFromPoint(c.center).VertexNeighbors(level)
 }
 
+func (c Cap) MayIntersect(cell Cell) bool {
+	return c.IntersectsCell(cell)
+}
+
 // Centroid returns the true centroid of the cap multiplied by its surface area
 // The result lies on the ray from the origin through the cap's center, but it
 // is not unit length. Note that if you just want the "surface centroid", i.e.

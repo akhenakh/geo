@@ -354,6 +354,10 @@ func (cu *CellUnion) CellUnionBound() []CellID {
 	return cu.CapBound().CellUnionBound()
 }
 
+func (cu *CellUnion) MayIntersect(c Cell) bool {
+	return cu.IntersectsCell(c)
+}
+
 // LeafCellsCovered reports the number of leaf cells covered by this cell union.
 // This will be no more than 6*2^60 for the whole sphere.
 func (cu *CellUnion) LeafCellsCovered() int64 {
