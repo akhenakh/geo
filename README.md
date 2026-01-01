@@ -17,7 +17,7 @@ Use at your own risk!!
 - `RegionTermIndexer` Large-scale geo-search, database-backed location queries, approximate-then-refine search patterns.
 - `Builder` and `CrossingEdge` Processing user-drawn boundaries, importing data from external sources, fixing GPS traces.
 - `BooleanOperation` Merging service areas, combining geographic regions, computing overlapping zones.
-- `EncodedS2ShapeIndex` Serializes spatial indexes for efficient storage and lazy loading, enabling rapid access to large static datasets with minimal memory overhead.
+- `EncodedShapeIndex` Serializes spatial indexes for efficient storage and lazy loading, enabling rapid access to large static datasets with minimal memory overhead.
 # S2 geometry library in Go
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/golang/geo.svg)](https://pkg.go.dev/github.com/golang/geo) [![Go Build and Test](https://github.com/golang/geo/actions/workflows/go.yml/badge.svg)](https://github.com/golang/geo/actions/workflows/go.yml) [![CodeQL](https://github.com/golang/geo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/golang/geo/actions/workflows/github-code-scanning/codeql) [![golangci-lint](https://github.com/golang/geo/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/golang/geo/actions/workflows/golangci-lint.yml) [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/golang/geo?label=OpenSSF%20Scorecard&style=flat)](https://scorecard.dev/viewer/?uri=github.com/golang/geo)
