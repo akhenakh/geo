@@ -7,7 +7,7 @@
 //     http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
+// distributed under the License is distributed on an "AS-IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
@@ -116,6 +116,21 @@ func NewShapeIndexCell(numShapes int) *ShapeIndexCell {
 	}
 }
 
+// NumClipped returns the number of clipped shapes in this cell.
+func (s *ShapeIndexCell) NumClipped() int {
+	return len(s.shapes)
+}
+
+// ClippedID returns the ShapeID of the i-th clipped shape.
+func (s *ShapeIndexCell) ClippedID(i int) int32 {
+	return s.shapes[i].shapeID
+}
+
+// ClippedContainsCenter returns true if the i-th clipped shape contains the cell center.
+func (s *ShapeIndexCell) ClippedContainsCenter(i int) bool {
+	return s.shapes[i].containsCenter
+}
+
 // numEdges reports the total number of edges in all clipped shapes in this cell.
 func (s *ShapeIndexCell) numEdges() int {
 	var e int
@@ -198,6 +213,19 @@ const (
 	IteratorEnd
 )
 
+// ShapeIndexView abstracts the read-only operations of a ShapeIndex required for iteration.
+// This allows ShapeIndexIterator to work with both ShapeIndex and EncodedS2ShapeIndex.
+type ShapeIndexView interface {
+	// cellLen returns the number of cells in the index.
+	cellLen() int
+	// cellID returns the CellID at the given index.
+	cellID(int) CellID
+	// indexCell returns the ShapeIndexCell at the given index.
+	indexCell(int) *ShapeIndexCell
+	// maybeApplyUpdates checks if the index is fresh and applies updates if not.
+	maybeApplyUpdates()
+}
+
 // ShapeIndexIterator is an iterator that provides low-level access to
 // the cells of the index. Cells are returned in increasing order of CellID.
 //
@@ -205,7 +233,7 @@ const (
 //	  fmt.Print(it.CellID())
 //	}
 type ShapeIndexIterator struct {
-	index    *ShapeIndex
+	index    ShapeIndexView
 	position int
 	id       CellID
 	cell     *ShapeIndexCell
@@ -213,7 +241,7 @@ type ShapeIndexIterator struct {
 
 // NewShapeIndexIterator creates a new iterator for the given index. If a starting
 // position is specified, the iterator is positioned at the given spot.
-func NewShapeIndexIterator(index *ShapeIndex, pos ...ShapeIndexIteratorPos) *ShapeIndexIterator {
+func NewShapeIndexIterator(index ShapeIndexView, pos ...ShapeIndexIteratorPos) *ShapeIndexIterator {
 	s := &ShapeIndexIterator{
 		index: index,
 	}
@@ -252,9 +280,6 @@ func (s *ShapeIndexIterator) CellID() CellID {
 
 // IndexCell returns the current index cell.
 func (s *ShapeIndexIterator) IndexCell() *ShapeIndexCell {
-	// TODO(roberts): C++ has this call a virtual method to allow subclasses
-	// of ShapeIndexIterator to do other work before returning the cell. Do
-	// we need such a thing?
 	return s.cell
 }
 
@@ -265,9 +290,7 @@ func (s *ShapeIndexIterator) Center() Point {
 
 // Begin positions the iterator at the beginning of the index.
 func (s *ShapeIndexIterator) Begin() {
-	if !s.index.IsFresh() {
-		s.index.maybeApplyUpdates()
-	}
+	s.index.maybeApplyUpdates()
 	s.position = 0
 	s.refresh()
 }
@@ -293,7 +316,7 @@ func (s *ShapeIndexIterator) Prev() bool {
 
 // End positions the iterator at the end of the index.
 func (s *ShapeIndexIterator) End() {
-	s.position = len(s.index.cells)
+	s.position = s.index.cellLen()
 	s.refresh()
 }
 
@@ -304,9 +327,9 @@ func (s *ShapeIndexIterator) Done() bool {
 
 // refresh updates the stored internal iterator values.
 func (s *ShapeIndexIterator) refresh() {
-	if s.position < len(s.index.cells) {
-		s.id = s.index.cells[s.position]
-		s.cell = s.index.cellMap[s.CellID()]
+	if s.position < s.index.cellLen() {
+		s.id = s.index.cellID(s.position)
+		s.cell = s.index.indexCell(s.position)
 	} else {
 		s.id = SentinelCellID
 		s.cell = nil
@@ -316,8 +339,8 @@ func (s *ShapeIndexIterator) refresh() {
 // seek positions the iterator at the first cell whose ID >= target, or at the
 // end of the index if no such cell exists.
 func (s *ShapeIndexIterator) seek(target CellID) {
-	s.position = sort.Search(len(s.index.cells), func(i int) bool {
-		return s.index.cells[i] >= target
+	s.position = sort.Search(s.index.cellLen(), func(i int) bool {
+		return s.index.cellID(i) >= target
 	})
 	s.refresh()
 }
@@ -630,6 +653,21 @@ type ShapeIndex struct {
 	pendingRemovals []*removedShape
 }
 
+// cellLen returns the number of cells in the index.
+func (s *ShapeIndex) cellLen() int {
+	return len(s.cells)
+}
+
+// cellID returns the CellID at the given index.
+func (s *ShapeIndex) cellID(i int) CellID {
+	return s.cells[i]
+}
+
+// indexCell returns the ShapeIndexCell at the given index.
+func (s *ShapeIndex) indexCell(i int) *ShapeIndexCell {
+	return s.cellMap[s.cells[i]]
+}
+
 // NewShapeIndex creates a new ShapeIndex.
 func NewShapeIndex() *ShapeIndex {
 	return &ShapeIndex{
@@ -842,7 +880,8 @@ func (s *ShapeIndex) applyUpdatesInternal() {
 		s.removeShapeInternal(p, allEdges, t)
 	}
 
-	for id := s.pendingAdditionsPos; id < int32(len(s.shapes)); id++ {
+	// We must iterate up to s.nextID, not len(s.shapes), because shapes is a map and may have gaps.
+	for id := s.pendingAdditionsPos; id < s.nextID; id++ {
 		s.addShapeInternal(id, allEdges, t)
 	}
 
@@ -851,7 +890,7 @@ func (s *ShapeIndex) applyUpdatesInternal() {
 	}
 
 	s.pendingRemovals = s.pendingRemovals[:0]
-	s.pendingAdditionsPos = int32(len(s.shapes))
+	s.pendingAdditionsPos = s.nextID
 	// It is the caller's responsibility to update the index status.
 }
 
@@ -1221,8 +1260,8 @@ func (s *ShapeIndex) makeIndexCell(p *PaddedCell, edges []*clippedEdge, t *track
 	for i := range numShapes {
 		var clipped *clippedShape
 		// advance to next value base + i
-		eshapeID := int32(s.Len())
-		cshapeID := eshapeID // Sentinels
+		eshapeID := s.nextID // Sentinel
+		cshapeID := eshapeID // Sentinel
 
 		if eNext != len(edges) {
 			eshapeID = edges[eNext].faceEdge.shapeID
