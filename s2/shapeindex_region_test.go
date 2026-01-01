@@ -253,7 +253,7 @@ func runVisitIntersectingShapesTest(t *testing.T, index *ShapeIndex) {
 	region := NewShapeIndexRegion(index)
 	iter := index.Iterator()
 
-	// Create an S2ShapeIndex for each shape in the original index
+	// Create an ShapeIndex for each shape in the original index
 	var shapeIndexes []*ShapeIndex
 	for i := 0; i < len(index.shapes); i++ {
 		si := NewShapeIndex()

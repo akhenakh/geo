@@ -19,7 +19,7 @@ package s2
 // The datum strategy resolves this.
 type DatumStrategy func(shape Shape) int
 
-// Options for S2ShapeNestingQuery.
+// Options for ShapeNestingQuery.
 type ShapeNestingQueryOptions struct {
 	DatumStrategy DatumStrategy
 }
