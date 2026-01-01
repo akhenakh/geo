@@ -157,7 +157,7 @@ func (s *EncodedShapeIndex) GetCell(i int) *ShapeIndexCell {
 	// We need numShapeIDs for decoding.
 	if err := cell.Decode(s.Len(), d); err != nil {
 		// Panic on data corruption for now as iterators don't return errors
-		panic(fmt.Errorf("failed to decode cell %d: %v", i, err))
+		panic(fmt.Errorf("failed to decode cell %d: %w", i, err))
 	}
 
 	s.cells[i] = cell

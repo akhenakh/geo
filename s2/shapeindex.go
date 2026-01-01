@@ -219,9 +219,9 @@ type ShapeIndexView interface {
 	// cellLen returns the number of cells in the index.
 	cellLen() int
 	// cellID returns the CellID at the given index.
-	cellID(int) CellID
+	cellID(index int) CellID
 	// indexCell returns the ShapeIndexCell at the given index.
-	indexCell(int) *ShapeIndexCell
+	indexCell(index int) *ShapeIndexCell
 	// maybeApplyUpdates checks if the index is fresh and applies updates if not.
 	maybeApplyUpdates()
 }

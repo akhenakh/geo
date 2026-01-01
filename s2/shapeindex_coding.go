@@ -116,7 +116,7 @@ func (s *ShapeIndexCell) Decode(numShapeIDs int, d *decoder) error {
 			}
 		}
 	} else {
-		header := uint64(d.readUvarint())
+		header := d.readUvarint()
 		numClipped := 1
 		if (header & 7) == 3 {
 			numClipped = int(header >> 3)
