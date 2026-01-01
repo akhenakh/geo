@@ -41,7 +41,7 @@ func TestEncodedUintVector(t *testing.T) {
 	}
 }
 
-func TestEncodedS2ShapeIndexRoundTrip(t *testing.T) {
+func TestEncodedShapeIndexRoundTrip(t *testing.T) {
 	// 1. Create a Mutable Index (standard ShapeIndex)
 	index := NewShapeIndex()
 
@@ -67,10 +67,10 @@ func TestEncodedS2ShapeIndexRoundTrip(t *testing.T) {
 		t.Fatalf("Encoding failed: %v", err)
 	}
 
-	// 3. Decode into EncodedS2ShapeIndex
+	// 3. Decode into EncodedShapeIndex
 	encodedData := buf.Bytes()
 
-	encodedIndex := NewEncodedS2ShapeIndex()
+	encodedIndex := NewEncodedShapeIndex()
 	// We need a ShapeFactory.
 	factory := &BasicShapeFactory{
 		Shapes: []Shape{polyline, &points},
@@ -120,7 +120,7 @@ func TestEncodedS2ShapeIndexRoundTrip(t *testing.T) {
 	}
 }
 
-func TestEncodedS2ShapeIndexJavaByteCompatibility(t *testing.T) {
+func TestEncodedShapeIndexJavaByteCompatibility(t *testing.T) {
 	// Replicates the C++ JavaByteCompatibility test.
 	// 1. Setup Expected Index
 	expected := NewShapeIndex()
@@ -188,7 +188,7 @@ func TestEncodedS2ShapeIndexJavaByteCompatibility(t *testing.T) {
 	factory := &BasicShapeFactory{Shapes: shapes}
 
 	// 2b. Decode Index
-	actual := NewEncodedS2ShapeIndex()
+	actual := NewEncodedShapeIndex()
 	// Pass the remaining stream to Init
 	// d.r is io.Reader, but we need to ensure we read from current pos.
 	// Since d.r is bytes.Reader (passed above), and decoder read methods advance it,

@@ -645,7 +645,7 @@ func (p *Polygon) IntersectsCell(cell Cell) bool {
 		return false
 	}
 	// If cell is subdivided into one or more index cells, there is an
-	// intersection to within the S2ShapeIndex error bound (see Contains).
+	// intersection to within the ShapeIndex error bound (see Contains).
 	if relation == Subdivided {
 		return true
 	}

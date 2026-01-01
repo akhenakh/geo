@@ -7,9 +7,9 @@ import (
 	"sync"
 )
 
-// EncodedS2ShapeIndex is a read-only S2ShapeIndex that works directly with encoded data.
+// EncodedShapeIndex is a read-only ShapeIndex that works directly with encoded data.
 // It is efficient for loading large indexes where only a few cells will be accessed.
-type EncodedS2ShapeIndex struct {
+type EncodedShapeIndex struct {
 	// options are the index options (maxEdgesPerCell)
 	maxEdgesPerCell int
 
@@ -43,16 +43,16 @@ func (f *BasicShapeFactory) GetShape(id int) Shape {
 }
 func (f *BasicShapeFactory) Len() int { return len(f.Shapes) }
 
-// NewEncodedS2ShapeIndex creates an empty encoded index.
-func NewEncodedS2ShapeIndex() *EncodedS2ShapeIndex {
-	return &EncodedS2ShapeIndex{
+// NewEncodedShapeIndex creates an empty encoded index.
+func NewEncodedShapeIndex() *EncodedShapeIndex {
+	return &EncodedShapeIndex{
 		cells: make(map[int]*ShapeIndexCell),
 	}
 }
 
 // Init initializes the index from an io.Reader.
 // The reader should contain the data produced by ShapeIndex.Encode.
-func (s *EncodedS2ShapeIndex) Init(r io.Reader, factory ShapeFactory) error {
+func (s *EncodedShapeIndex) Init(r io.Reader, factory ShapeFactory) error {
 	d := &decoder{r: asByteReader(r)}
 
 	// Read max edges and version
@@ -80,7 +80,7 @@ func (s *EncodedS2ShapeIndex) Init(r io.Reader, factory ShapeFactory) error {
 }
 
 // Shape returns the shape with the given ID.
-func (s *EncodedS2ShapeIndex) Shape(id int32) Shape {
+func (s *EncodedShapeIndex) Shape(id int32) Shape {
 	if s.shapeFactory == nil {
 		return nil
 	}
@@ -88,7 +88,7 @@ func (s *EncodedS2ShapeIndex) Shape(id int32) Shape {
 }
 
 // Len returns number of shapes.
-func (s *EncodedS2ShapeIndex) Len() int {
+func (s *EncodedShapeIndex) Len() int {
 	if s.shapeFactory == nil {
 		return 0
 	}
@@ -96,7 +96,7 @@ func (s *EncodedS2ShapeIndex) Len() int {
 }
 
 // NumEdges returns total edges.
-func (s *EncodedS2ShapeIndex) NumEdges() int {
+func (s *EncodedShapeIndex) NumEdges() int {
 	n := 0
 	count := s.Len()
 	for i := 0; i < count; i++ {
@@ -109,30 +109,30 @@ func (s *EncodedS2ShapeIndex) NumEdges() int {
 }
 
 // Iterator returns a new iterator for the encoded index.
-func (s *EncodedS2ShapeIndex) Iterator() *ShapeIndexIterator {
+func (s *EncodedShapeIndex) Iterator() *ShapeIndexIterator {
 	return NewShapeIndexIterator(s, IteratorBegin)
 }
 
 // Implement ShapeIndexView interface
 
-func (s *EncodedS2ShapeIndex) cellLen() int {
+func (s *EncodedShapeIndex) cellLen() int {
 	return s.cellIDs.Size()
 }
 
-func (s *EncodedS2ShapeIndex) cellID(i int) CellID {
+func (s *EncodedShapeIndex) cellID(i int) CellID {
 	return s.cellIDs.Get(i)
 }
 
-func (s *EncodedS2ShapeIndex) indexCell(i int) *ShapeIndexCell {
+func (s *EncodedShapeIndex) indexCell(i int) *ShapeIndexCell {
 	return s.GetCell(i)
 }
 
-func (s *EncodedS2ShapeIndex) maybeApplyUpdates() {
+func (s *EncodedShapeIndex) maybeApplyUpdates() {
 	// Read-only
 }
 
 // GetCell returns the decoded cell at index i.
-func (s *EncodedS2ShapeIndex) GetCell(i int) *ShapeIndexCell {
+func (s *EncodedShapeIndex) GetCell(i int) *ShapeIndexCell {
 	s.cellsMu.RLock()
 	if cell, ok := s.cells[i]; ok {
 		s.cellsMu.RUnlock()
