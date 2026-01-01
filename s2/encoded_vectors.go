@@ -53,7 +53,7 @@ func (v *EncodedUintVector[T]) encode(e *encoder) {
 // encodeUintVector encodes a slice of values.
 func encodeUintVector[T interface{ uint64 | uint32 | uint16 }](values []T, e *encoder) {
 	if len(values) == 0 {
-		e.writeUvarint(uint64(0) | uint64(0)) // size=0, len=1 (encoded as 0)
+		e.writeUvarint(0)
 		return
 	}
 
