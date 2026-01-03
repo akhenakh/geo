@@ -6,6 +6,9 @@ import (
 	"github.com/ajroetker/go-highway/hwy"
 )
 
+// Batch Centroid Calculation
+// Calculating the centroid of a Polygon involves iterating over all loops and summing vectors. While Loop.Area is complex, Polyline and Polygon centroid accumulation can be vectorized. Specifically, converting a Point vector (AoS) to planar representation requires de-interleaving.
+
 // BaseSumPoints computes the vector sum of a list of coordinates.
 // Input is de-interleaved (separate slices for X, Y, Z coordinates).
 // Returns the sum X, Y, Z.

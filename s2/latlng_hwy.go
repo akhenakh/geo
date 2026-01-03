@@ -7,6 +7,9 @@ import (
 	"github.com/ajroetker/go-highway/hwy/contrib/algo"
 )
 
+// Batch Point <-> LatLng Conversion
+// When loading large datasets (e.g., GeoJSON parsing), the library converts thousands of LatLng pairs into Point (XYZ). This involves heavy trigonometry (Sin, Cos). Using the hwy/contrib/algo transforms provides a massive speedup here.
+
 // BasePointsFromLatLngsBatch converts a slice of LatLngs to Points (XYZ) using SIMD.
 // This de-interleaves the structs into separate arrays for vectorization.
 func BasePointsFromLatLngsBatch(lats, lngs, xs, ys, zs []float64) {

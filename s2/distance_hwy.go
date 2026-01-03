@@ -8,6 +8,8 @@ import (
 	"github.com/ajroetker/go-highway/hwy"
 )
 
+//For small to medium-sized point sets (or leaf cells in an index), building a full acceleration structure overhead outweighs the query time. A brute-force SIMD scan is often the fastest way to find the closest point in a PointVector or LaxLoop.
+
 // BaseMinDistanceToPoint finds the minimum squared Euclidean distance from a target point
 // to a set of points (SoA layout).
 // Used for ChordAngle comparisons where distance = |u-v|^2.

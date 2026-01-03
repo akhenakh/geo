@@ -6,6 +6,9 @@ import (
 	"github.com/ajroetker/go-highway/hwy"
 )
 
+// Batch Cross Product (Structure of Arrays)
+// Computing normals for a list of edges (e.g., in a mesh or a complex polygon) involves cross products. Doing this in a batch using Structure of Arrays (SoA) layout is significantly faster than the standard slice-of-structs approach.
+
 // BaseBatchCrossProduct computes the cross product of two sets of vectors (SoA layout).
 // cx = ay*bz - az*by
 // cy = az*bx - ax*bz

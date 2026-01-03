@@ -6,6 +6,9 @@ import (
 	"github.com/ajroetker/go-highway/hwy"
 )
 
+// Batch ZigZag Encoding/Decoding
+// The ShapeIndex uses ZigZag encoding heavily for point compression. While the derivative coding is serial, the ZigZag step is element-wise independent and perfect for SIMD. This speeds up both Encode and Decode operations for large geometries.
+
 // BaseZigZagEncodeBatch applies ZigZag encoding to a slice of int32s.
 // (n << 1) ^ (n >> 31)
 func BaseZigZagEncodeBatch[T hwy.SignedInts, U hwy.UnsignedInts](src []T, dst []U) {

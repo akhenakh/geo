@@ -6,6 +6,9 @@ import (
 	"github.com/ajroetker/go-highway/hwy"
 )
 
+// Batch Bounding Box Computation
+// Calculating the RectBound or R2Rect for a LaxPolygon or Polyline involves iterating over all vertices to find min/max latitudes and longitudes (or X/Y). SIMD reduction makes this instantaneous.
+
 // BaseBatchMinMax computes the minimum and maximum values in a slice.
 // Used for computing bounding boxes of raw coordinates.
 func BaseBatchMinMax[T hwy.Floats](data []T) (minVal, maxVal T) {
