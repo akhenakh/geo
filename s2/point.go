@@ -366,3 +366,28 @@ func (p Point) EnsureNormalizable() Point {
 	}
 	return p
 }
+
+// DeinterleavePoints separates a slice of Points into component slices.
+// Useful for SIMD processing.
+func DeinterleavePoints(pts []Point) (xs, ys, zs []float64) {
+	n := len(pts)
+	xs = make([]float64, n)
+	ys = make([]float64, n)
+	zs = make([]float64, n)
+	for i, p := range pts {
+		xs[i] = p.X
+		ys[i] = p.Y
+		zs[i] = p.Z
+	}
+	return
+}
+
+// InterleavePoints reconstructs points from component slices.
+func InterleavePoints(xs, ys, zs []float64) []Point {
+	n := len(xs)
+	pts := make([]Point, n)
+	for i := 0; i < n; i++ {
+		pts[i] = Point{r3.Vector{X: xs[i], Y: ys[i], Z: zs[i]}}
+	}
+	return pts
+}
