@@ -37,6 +37,11 @@ type Projection interface {
 	// but the implementation is more efficient.
 	FromLatLng(ll LatLng) r2.Point
 
+	// FromLatLngBatch projects a slice of LatLngs into r2.Points.
+	// This can use SIMD optimizations for better throughput.
+	// src and dst must have the same length.
+	FromLatLngBatch(src []LatLng, dst []r2.Point)
+
 	// ToLatLng is a convenience function equivalent to LatLngFromPoint(Unproject(p)),
 	// but the implementation is more efficient.
 	ToLatLng(p r2.Point) LatLng
@@ -118,6 +123,42 @@ func (p *PlateCarreeProjection) FromLatLng(ll LatLng) r2.Point {
 	}
 }
 
+// FromLatLngBatch projects a slice of LatLngs into r2.Points.
+func (p *PlateCarreeProjection) FromLatLngBatch(src []LatLng, dst []r2.Point) {
+	if len(src) != len(dst) {
+		panic("s2: FromLatLngBatch source and destination slice lengths differ")
+	}
+
+	// For PlateCarree, the operations are simple multiplications, so the overhead
+	// of de-interleaving for SIMD might outweigh benefits for small batches.
+	// However, we provide the SIMD path for large batches.
+	if len(src) < 64 {
+		for i := range src {
+			dst[i] = p.FromLatLng(src[i])
+		}
+		return
+	}
+
+	// De-interleave for SIMD processing
+	n := len(src)
+	lats := make([]float64, n)
+	lngs := make([]float64, n)
+	xs := make([]float64, n)
+	ys := make([]float64, n)
+
+	for i := range src {
+		lats[i] = float64(src[i].Lat)
+		lngs[i] = float64(src[i].Lng)
+	}
+
+	// Call generated SIMD function
+	PlateCarreeProjectFloat64(lats, lngs, xs, ys, p.fromRadians)
+
+	for i := range dst {
+		dst[i] = r2.Point{X: xs[i], Y: ys[i]}
+	}
+}
+
 // ToLatLng returns the LatLng projected from the given R2 Point.
 func (p *PlateCarreeProjection) ToLatLng(pt r2.Point) LatLng {
 	return LatLng{
@@ -192,6 +233,42 @@ func (p *MercatorProjection) FromLatLng(ll LatLng) r2.Point {
 	sinPhi := math.Sin(float64(ll.Lat))
 	y := 0.5 * math.Log((1+sinPhi)/(1-sinPhi))
 	return r2.Point{X: p.fromRadians * float64(ll.Lng), Y: p.fromRadians * y}
+}
+
+// FromLatLngBatch projects a slice of LatLngs into r2.Points using SIMD where available.
+func (p *MercatorProjection) FromLatLngBatch(src []LatLng, dst []r2.Point) {
+	if len(src) != len(dst) {
+		panic("s2: FromLatLngBatch source and destination slice lengths differ")
+	}
+
+	// For very small batches, scalar might be faster due to allocation of temp buffers.
+	if len(src) < 16 {
+		for i := range src {
+			dst[i] = p.FromLatLng(src[i])
+		}
+		return
+	}
+
+	n := len(src)
+	// We need Structure of Arrays (SoA) layout for SIMD
+	lats := make([]float64, n)
+	lngs := make([]float64, n)
+	xs := make([]float64, n)
+	ys := make([]float64, n)
+
+	// De-interleave
+	for i := range src {
+		lats[i] = float64(src[i].Lat)
+		lngs[i] = float64(src[i].Lng)
+	}
+
+	// Call the SIMD implementation
+	MercatorProjectFloat64(lats, lngs, xs, ys, p.fromRadians)
+
+	// Interleave results
+	for i := range dst {
+		dst[i] = r2.Point{X: xs[i], Y: ys[i]}
+	}
 }
 
 // ToLatLng returns the LatLng projected from the given R2 Point.
