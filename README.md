@@ -1,6 +1,6 @@
-# AI Assisted Port of the C++ Library
+# Fork AI Assisted Port of Some Features form the C++ Library
 
-This is an experimental AI port of some of the C++ functionalities missing in the Go version, it was done with Gemini 3 & Codestral.
+This is an experimental AI port of some of the C++ functionalities missing in the original Go (golang/geo) version, it was done with Gemini 3 & Codestral.
 
 Methodology was to fill as much as possible the context with existing Go code and existing C++ code, asking to port feature by feature and reuse existing C++ tests.
 
@@ -18,6 +18,7 @@ Use at your own risk!!
 - `Builder` and `CrossingEdge` Processing user-drawn boundaries, importing data from external sources, fixing GPS traces.
 - `BooleanOperation` Merging service areas, combining geographic regions, computing overlapping zones.
 - `EncodedShapeIndex` Serializes spatial indexes for efficient storage and lazy loading, enabling rapid access to large static datasets with minimal memory overhead.
+
 # S2 geometry library in Go
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/golang/geo.svg)](https://pkg.go.dev/github.com/golang/geo) [![Go Build and Test](https://github.com/golang/geo/actions/workflows/go.yml/badge.svg)](https://github.com/golang/geo/actions/workflows/go.yml) [![CodeQL](https://github.com/golang/geo/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/golang/geo/actions/workflows/github-code-scanning/codeql) [![golangci-lint](https://github.com/golang/geo/actions/workflows/golangci-lint.yml/badge.svg)](https://github.com/golang/geo/actions/workflows/golangci-lint.yml) [![OpenSSF Scorecard](https://img.shields.io/ossf-scorecard/github.com/golang/geo?label=OpenSSF%20Scorecard&style=flat)](https://scorecard.dev/viewer/?uri=github.com/golang/geo)
