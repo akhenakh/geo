@@ -243,7 +243,7 @@ func (s *PolylineSimplifier) getDirection(p Point) float64 {
 // roundDirection is +1 (round up/upper bound) or -1 (round down/lower bound).
 func (s *PolylineSimplifier) getSemiwidth(p Point, r s1.ChordAngle, roundDirection float64) float64 {
 	// Based on error analysis in s2polyline_simplifier.cc.
-	const dblError = 0.5 * dblEpsilon
+	const dblError = 0.5 * machineEpsilon64
 
 	r2 := float64(r)
 	// ChordAngleBetweenPoints is in s2 package
